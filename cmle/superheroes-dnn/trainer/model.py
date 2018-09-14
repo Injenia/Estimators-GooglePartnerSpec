@@ -85,23 +85,7 @@ def get_features(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, EMBEDDING_
                 vocabulary_list=list(FIELD_CATEGORIES[c])
             )
             emb=tf.feature_column.embedding_column(cat,float(EMBEDDING_COLUMNS_SIZE))
-            """
-                SELF NOTE:
-                with this signature: tf.feature_column.embedding_column(cat,EMBEDDING_COLUMNS_SIZE)
-                EMBEDDING_COLUMNS_SIZE is an integer, and I get the following error:
-                    "a float is required"
-                the documentation (https://www.tensorflow.org/api_docs/python/tf/feature_column/embedding_column) states:
-                tf.feature_column.embedding_column(
-                    categorical_column,
-                    dimension,
-                    ...
-                 )
-                    Args:
-                        categorical_column: A _CategoricalColumn created by a categorical_column_with_* function. This column produces the sparse IDs that are inputs to the embedding lookup.
-                        dimension: An integer specifying dimension of the embedding, must be > 0.
-                        
-                regardless of this, when invoked with tf.feature_column.embedding_column(cat,float(EMBEDDING_COLUMNS_SIZE)), it does not throw any errors..
-            """
+            
             feature_columns.append(emb)
         if FIELD_TYPES[c]=="number":
             feature_columns.append(tf.feature_column.numeric_column(key=c))
