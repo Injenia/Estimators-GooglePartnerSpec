@@ -52,6 +52,11 @@ if __name__ == '__main__':
             type=float,
             required=True
     )
+    parser.add_argument(
+            '--FEATURE_COLUMN_NUM_BUCKETS',
+            type=int,
+            required=True
+    )
 
     # parse args
     args = parser.parse_args()
@@ -69,17 +74,21 @@ if __name__ == '__main__':
             MODEL_DIR,
             json.loads(os.environ.get('TF_CONFIG', '{}')).get('task', {}).get('trial', '')
     )
-
+        
     LEARNING_RATE=arguments["LEARNING_RATE"]
     L1_NORM=arguments["L1_NORM"]
     L2_NORM=arguments["L2_NORM"]
-
+    FEATURE_COLUMN_NUM_BUCKETS=arguments["FEATURE_COLUMN_NUM_BUCKETS"]
+    
     with open_file(os.path.join(MODEL_DIR,"data","dataset_fields.json"), "r") as f:
         config=json.load(f)
         COLUMNS=config["fields"]["columns"]
         FIELD_TYPES=config["fields"]["types"]
         FIELD_CATEGORIES=config["fields"]["categories"]
         LABEL_FIELD=config["label"]["column"]
+        MINS=config["mins"]
+        MAXS=config["maxs"]
+        
         
     
     FIELD_DEFAULTS=[]
@@ -94,7 +103,7 @@ if __name__ == '__main__':
     # run
     tf.logging.set_verbosity(tf.logging.INFO)
     # create estimator
-    feature_columns, estimator = model.build_model(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, output_dir, LEARNING_RATE, L1_NORM, L2_NORM)
+    feature_columns, estimator = model.build_model(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, output_dir, LEARNING_RATE, L1_NORM, L2_NORM, FEATURE_COLUMN_NUM_BUCKETS, MINS, MAXS)
 
     train_spec = tf.estimator.TrainSpec(input_fn=model.read_dataset(
         MODEL_DIR, FIELD_DEFAULTS, COLUMNS, LABEL_FIELD,
@@ -105,16 +114,14 @@ if __name__ == '__main__':
     )
 
     eval_spec = tf.estimator.EvalSpec(input_fn=model.read_dataset(MODEL_DIR, FIELD_DEFAULTS, COLUMNS, LABEL_FIELD,
-        BATCH_SIZE=arguments['BATCH_SIZE'], 
+        BATCH_SIZE=300, #arguments['BATCH_SIZE'], # 300 should guarantee the full eval set coverage
         TRAIN_STEPS=arguments['TRAIN_STEPS'],
         mode=tf.estimator.ModeKeys.EVAL),
-        #steps = None,
         start_delay_secs = 2*60,#20 * 60, # start evaluating after N seconds
         throttle_secs = 1*60)#10 * 60)    # evaluate every N seconds
 
     tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
-
-    
+  
     try:
         feature_spec = tf.feature_column.make_parse_example_spec(feature_columns)
         export_input_fn = tf.estimator.export.build_parsing_serving_input_receiver_fn(feature_spec)

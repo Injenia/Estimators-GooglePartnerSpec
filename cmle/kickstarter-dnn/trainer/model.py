@@ -47,6 +47,7 @@ def read_dataset(MODEL_DIR, FIELD_DEFAULTS, COLUMNS, LABEL_FIELD, BATCH_SIZE, TR
     return create_trainset if mode == tf.contrib.learn.ModeKeys.TRAIN else create_evalset
 
 
+
 def get_features(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, EMBEDDING_COLUMNS_SIZE):
     feature_columns=[]
     for c in COLUMNS:
@@ -59,7 +60,7 @@ def get_features(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, EMBEDDING_
                 vocabulary_list=list(FIELD_CATEGORIES[c])
             )
             emb=tf.feature_column.embedding_column(cat,float(EMBEDDING_COLUMNS_SIZE))
-            
+
             feature_columns.append(emb)
         if FIELD_TYPES[c]=="number":
             feature_columns.append(tf.feature_column.numeric_column(key=c))

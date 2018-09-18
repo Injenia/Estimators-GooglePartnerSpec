@@ -5,7 +5,6 @@ import numpy as np
 import os
 
 def read_dataset(MODEL_DIR, FIELD_DEFAULTS, COLUMNS, LABEL_FIELD, BATCH_SIZE, TRAIN_STEPS, mode=tf.contrib.learn.ModeKeys.EVAL):
-     
     
     def create_trainset():
         ds = tf.data.TextLineDataset(os.path.join(MODEL_DIR,"data","tf_trainset.csv")).skip(1)
@@ -25,7 +24,6 @@ def read_dataset(MODEL_DIR, FIELD_DEFAULTS, COLUMNS, LABEL_FIELD, BATCH_SIZE, TR
 
         return parsed_ds.shuffle(TRAIN_STEPS).repeat().batch(BATCH_SIZE)
 
-    
     def create_evalset():
         ds = tf.data.TextLineDataset(os.path.join(MODEL_DIR,"data","tf_evalset.csv")).skip(1)
         def _parse_line(line):
@@ -47,22 +45,34 @@ def read_dataset(MODEL_DIR, FIELD_DEFAULTS, COLUMNS, LABEL_FIELD, BATCH_SIZE, TR
     return create_trainset if mode == tf.contrib.learn.ModeKeys.TRAIN else create_evalset
 
 
-def get_features(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, EMBEDDING_COLUMNS_SIZE):
+def frange(start, stop, step):
+    x = start
+    while x < stop:
+        yield x
+        x += step
+
+def get_features(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, FEATURE_COLUMN_NUM_BUCKETS, MINS, MAXS):
     feature_columns=[]
     for c in COLUMNS:
         if c == LABEL_FIELD:
             continue
 
         if FIELD_TYPES[c]=="string":
-            cat=tf.feature_column.categorical_column_with_vocabulary_list(
-                key=c,
-                vocabulary_list=list(FIELD_CATEGORIES[c])
-            )
-            emb=tf.feature_column.embedding_column(cat,float(EMBEDDING_COLUMNS_SIZE))
-            
-            feature_columns.append(emb)
+            feature_columns.append(tf.feature_column.categorical_column_with_vocabulary_list(
+                    key=c,
+                    vocabulary_list=list(FIELD_CATEGORIES[c])
+                ))
         if FIELD_TYPES[c]=="number":
-            feature_columns.append(tf.feature_column.numeric_column(key=c))
+            feature_columns.append(
+                tf.feature_column.bucketized_column(
+                    source_column = tf.feature_column.numeric_column(key=c),
+                    boundaries=list(frange(
+                        MINS[c],
+                        MAXS[c],
+                        (MAXS[c]-MINS[c])/FEATURE_COLUMN_NUM_BUCKETS
+                    ))
+                )
+            )
     
     return feature_columns
     
@@ -70,20 +80,18 @@ def get_features(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, EMBEDDING_
 def parse_hidden_units(s):
     return [int(item) for item in s.split(',')]
 
-def build_model(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, MODEL_DIR, LEARNING_RATE, L1_NORM, L2_NORM, EMBEDDING_COLUMNS_SIZE, HIDDEN_UNITS):
-    
-    feature_columns = get_features(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, EMBEDDING_COLUMNS_SIZE)
-    
-    HIDDEN_UNITS=parse_hidden_units(HIDDEN_UNITS)
+def build_model(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES, MODEL_DIR, LEARNING_RATE, L1_NORM, L2_NORM,
+               FEATURE_COLUMN_NUM_BUCKETS, MINS, MAXS):
+    feature_columns = get_features(COLUMNS, LABEL_FIELD, FIELD_TYPES, FIELD_CATEGORIES,
+                                  FEATURE_COLUMN_NUM_BUCKETS, MINS, MAXS)
 
-    return feature_columns, tf.estimator.DNNClassifier(
-        HIDDEN_UNITS,
+
+    return feature_columns, tf.estimator.LinearClassifier(
         feature_columns,
         n_classes=len(FIELD_CATEGORIES[LABEL_FIELD]),
         label_vocabulary=list(FIELD_CATEGORIES[LABEL_FIELD]),
         model_dir=MODEL_DIR,
-        optimizer=tf.train.FtrlOptimizer(learning_rate=LEARNING_RATE,
-                                        l1_regularization_strength=L1_NORM, 
-                                        l2_regularization_strength=L2_NORM)
+        optimizer=tf.train.FtrlOptimizer(learning_rate=LEARNING_RATE, 
+                                         l1_regularization_strength=L1_NORM, 
+                                         l2_regularization_strength=L2_NORM)
     )
-    
