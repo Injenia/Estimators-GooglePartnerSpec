@@ -1,7 +1,7 @@
 # Estimators-GooglePartnerSpec
 
 ### Dependencies
-The resorces in these notebooks are heavely based on:
+The resources in these notebooks are heavely based on:
 
 Pandas https://pandas.pydata.org/
 
